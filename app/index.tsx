@@ -9,7 +9,7 @@ export default function Home() {
     <SafeAreaView className="flex-1 bg-white">
       <View className="flex-1 items-center justify-center p-6">
         <Text className="mb-4 text-3xl font-bold text-primary">
-          {Constants.expoConfig?.name ?? '{{APP_NAME}}'}
+          {Constants.expoConfig?.name ?? 'Audiobook Assistant'}
         </Text>
         <Text className="mb-6 text-center text-lg text-muted-foreground">
           Welcome to your new mobile app!

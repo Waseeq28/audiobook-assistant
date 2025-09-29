@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "{{APP_NAME}}",
-    "slug": "{{APP_SLUG}}",
+    "name": "Audiobook Assistant",
+    "slug": "audiobook-assistant",
     "version": "1.0.0",
-    "scheme": "{{APP_SCHEME}}",
+    "scheme": "audiobook-assistant",
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -31,7 +31,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "{{ANDROID_PACKAGE}}"
+      "package": "com.waseeq.audiobookassistant"
     },
     "extra": {
       "router": {}

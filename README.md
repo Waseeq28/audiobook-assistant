@@ -24,8 +24,8 @@ React Native template with Expo, Supabase, NativeWind, and Shadcn/UI components.
 1. Clone and install:
 
 ```bash
-git clone <repo-url> {{PROJECT_NAME}}
-cd {{PROJECT_NAME}}
+git clone <repo-url> audiobook-assistant
+cd audiobook-assistant
 npm install
 ```
 
@@ -75,11 +75,11 @@ npx expo start
 
 If not using the setup script, replace these placeholders:
 
-- `{{PROJECT_NAME}}` - Project name (kebab-case)
-- `{{APP_NAME}}` - Display name
-- `{{APP_SLUG}}` - App slug
-- `{{APP_SCHEME}}` - URL scheme
-- `{{ANDROID_PACKAGE}}` - Android package name
+- `audiobook-assistant` - Project name (kebab-case)
+- `Audiobook Assistant` - Display name
+- `audiobook-assistant` - App slug
+- `audiobook-assistant` - URL scheme
+- `com.waseeq.audiobookassistant` - Android package name
 
 ## Creating an EAS Development Build
 
