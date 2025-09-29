@@ -104,7 +104,3 @@ If you run into issues, check these references for more information:
 - **[NativeWind Documentation](https://www.nativewind.dev/docs/getting-started/installation)** - Tailwind CSS for React Native styling
 - **[React Native Reusables](https://reactnativereusables.com/docs)** - Shadcn/UI components adapted for React Native
 - **[Supabase Documentation](https://supabase.com/docs)** - Backend-as-a-Service platform for authentication, database, and real-time features
-
-## License
-
-MIT License
