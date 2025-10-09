@@ -3,10 +3,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { BookHeader } from '@/components/book-header';
 import { SectionItem } from '@/components/section-item';
-import { type MockAudiobook } from '@/lib/mockData';
+import { type LibriVoxAudiobook } from '@/lib/types';
 
 interface BookDetailViewProps {
-  book: MockAudiobook;
+  book: LibriVoxAudiobook;
 }
 
 export function BookDetailView({ book }: BookDetailViewProps) {
@@ -22,9 +22,9 @@ export function BookDetailView({ book }: BookDetailViewProps) {
             title={book.title}
             authors={book.authors}
             genres={book.genres}
-            totalTime={book.totalTime}
+            totalTime={book.totaltime}
             description={book.description}
-            coverUrl={book.coverUrl}
+            coverUrl={book.coverart_thumbnail || book.coverart_jpg}
           />
         )}
         renderItem={({ item }) => <SectionItem section={item} />}

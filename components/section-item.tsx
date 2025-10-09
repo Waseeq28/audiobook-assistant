@@ -1,9 +1,10 @@
 import { View } from 'react-native';
 import { Text } from '@/components/ui/text';
-import { type MockAudioSection } from '@/lib/mockData';
+import { AudioPlayer } from '@/components/audio-player';
+import { type LibriVoxSection } from '@/lib/types';
 
 interface SectionItemProps {
-  section: MockAudioSection;
+  section: LibriVoxSection;
 }
 
 export function SectionItem({ section }: SectionItemProps) {
@@ -12,10 +13,15 @@ export function SectionItem({ section }: SectionItemProps) {
       <Text className="text-base font-medium" numberOfLines={2}>
         {section.title}
       </Text>
-      <Text className="mt-2 text-sm text-muted-foreground">{section.duration}</Text>
-      <Text className="mt-2 text-xs uppercase tracking-wide text-muted-foreground">
-        Preview unavailable in mock mode
+      <Text className="mt-1 text-sm text-muted-foreground">
+        Section {section.section_number} • {section.playtime}
       </Text>
+
+      <AudioPlayer
+        section={section}
+        onPlaybackStart={() => console.log('Playback started for:', section.title)}
+        onPlaybackEnd={() => console.log('Playback ended for:', section.title)}
+      />
     </View>
   );
 }
