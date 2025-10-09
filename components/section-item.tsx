@@ -19,8 +19,8 @@ export function SectionItem({ section }: SectionItemProps) {
 
       <AudioPlayer
         section={section}
-        onPlaybackStart={() => console.log('Playback started for:', section.title)}
         onPlaybackEnd={() => console.log('Playback ended for:', section.title)}
+        onAIAssistantPress={() => console.log('AI Assistant activated for:', section.title)}
       />
     </View>
   );

@@ -7,17 +7,19 @@ import {
   Pressable,
 } from 'react-native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { Ionicons } from '@expo/vector-icons'; // Using Expo's vector icons
-import { Text } from '@/components/ui/text'; // Assuming this is a custom Text component
+import { Ionicons } from '@expo/vector-icons';
+import { Text } from '@/components/ui/text';
+import { AIAssistantButton } from '@/components/ai-assistant-button';
 import { LibriVoxSection } from '@/lib/types';
 
 // --- Component Props ---
 interface AudioPlayerProps {
   section: LibriVoxSection;
   onPlaybackEnd?: (didJustFinish: boolean) => void;
+  onAIAssistantPress?: () => void;
 }
 
-export function AudioPlayer({ section, onPlaybackEnd }: AudioPlayerProps) {
+export function AudioPlayer({ section, onPlaybackEnd, onAIAssistantPress }: AudioPlayerProps) {
   const [progressBarWidth, setProgressBarWidth] = useState(0);
 
   // --- Audio Player Setup ---
@@ -61,7 +63,7 @@ export function AudioPlayer({ section, onPlaybackEnd }: AudioPlayerProps) {
       if (
         !status.isLoaded ||
         typeof status.duration !== 'number' ||
-        !isFinite(status.duration) || // Ensure duration is a finite number
+        !isFinite(status.duration) ||
         status.duration <= 0 ||
         progressBarWidth === 0
       ) {
@@ -72,7 +74,6 @@ export function AudioPlayer({ section, onPlaybackEnd }: AudioPlayerProps) {
       const percentage = tapPosition / progressBarWidth;
       const newTime = percentage * status.duration;
 
-      // Final safety check to ensure the calculated time is valid before seeking
       if (isFinite(newTime)) {
         player.seekTo(newTime);
       }
@@ -113,7 +114,6 @@ export function AudioPlayer({ section, onPlaybackEnd }: AudioPlayerProps) {
 
       {/* Progress Bar and Time */}
       <View className="mb-2">
-        {/* FIX: Switched to Pressable and combined onLayout and onPress for accuracy */}
         <Pressable onPress={handleSeekToPosition} onLayout={onProgressBarLayout}>
           <View className="h-2 w-full rounded-full bg-slate-200">
             <View
@@ -133,7 +133,7 @@ export function AudioPlayer({ section, onPlaybackEnd }: AudioPlayerProps) {
       </View>
 
       {/* Control Buttons */}
-      <View className="flex-row items-center justify-center space-x-6">
+      <View className="flex-row items-center justify-center space-x-4">
         <TouchableOpacity onPress={() => seekBy(-15)} disabled={!status.isLoaded} className="p-2">
           <Ionicons name="play-back" size={24} color={!status.isLoaded ? '#CBD5E1' : '#334155'} />
         </TouchableOpacity>
@@ -156,6 +156,21 @@ export function AudioPlayer({ section, onPlaybackEnd }: AudioPlayerProps) {
             color={!status.isLoaded ? '#CBD5E1' : '#334155'}
           />
         </TouchableOpacity>
+      </View>
+
+      {/* AI Assistant Button */}
+      <View className="mt-4 items-center">
+        <AIAssistantButton
+          onPress={() => {
+            // Pause playback when AI assistant is activated
+            if (status.playing) {
+              player.pause();
+            }
+            onAIAssistantPress?.();
+          }}
+          disabled={!status.isLoaded}
+        />
+        <Text className="mt-2 text-xs text-slate-500">Ask AI Assistant</Text>
       </View>
     </View>
   );

@@ -10,11 +10,15 @@ interface BookDetailViewProps {
 }
 
 export function BookDetailView({ book }: BookDetailViewProps) {
+  // DEVELOPMENT: Limit sections to 2 for faster loading
+  // TODO: Remove this limit for production
+  const limitedSections = book.sections?.slice(0, 2) || [];
+
   return (
     <SafeAreaView className="flex-1 bg-background">
       <Stack.Screen options={{ title: book.title, headerShown: false }} />
       <FlatList
-        data={book.sections}
+        data={limitedSections}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 32 }}
         ListHeaderComponent={() => (
