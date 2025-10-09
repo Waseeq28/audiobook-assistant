@@ -3,7 +3,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { Text } from '@/components/ui/text';
 import { Search } from '@/components/search';
-import { searchAudiobooks } from '@/lib/mockData';
 
 export default function Home() {
   return (
@@ -17,7 +16,7 @@ export default function Home() {
         </View>
       </View>
 
-      <Search searchFunction={searchAudiobooks} />
+      <Search />
     </SafeAreaView>
   );
 }
