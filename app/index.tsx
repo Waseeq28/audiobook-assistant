@@ -2,7 +2,8 @@ import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { Text } from '@/components/ui/text';
-import { Search } from '@/components/search';
+// import { Search } from '@/components/search';
+import { VoiceRecorder } from '@/components/voice-recorder-test';
 
 export default function Home() {
   return (
@@ -16,7 +17,8 @@ export default function Home() {
         </View>
       </View>
 
-      <Search />
+      {/* <Search /> */}
+      <VoiceRecorder />
     </SafeAreaView>
   );
 }
