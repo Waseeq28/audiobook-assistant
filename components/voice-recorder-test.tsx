@@ -11,10 +11,13 @@ import {
 } from 'expo-audio';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { TranscriptionDisplay } from '@/components/transcription-display';
 
 export function VoiceRecorder() {
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
+  const [transcription, setTranscription] = useState<string | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(audioRecorder);
@@ -43,6 +46,7 @@ export function VoiceRecorder() {
     try {
       await audioRecorder.prepareToRecordAsync();
       audioRecorder.record();
+      setTranscription(null);
     } catch (error) {
       console.error('Failed to start recording:', error);
       Alert.alert('Error', 'Failed to start recording');
@@ -76,6 +80,46 @@ export function VoiceRecorder() {
         player.seekTo(0);
       }
       player.play();
+    }
+  };
+
+  const transcribeRecording = async () => {
+    if (!recordingUri || recorderState.isRecording) {
+      return;
+    }
+
+    try {
+      setIsTranscribing(true);
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri: recordingUri,
+        name: 'recording.m4a',
+        type: 'audio/m4a',
+      } as any);
+
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/transcribe-audio`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+          },
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Transcription request failed');
+      }
+
+      const result = (await response.json()) as { text?: string };
+      setTranscription(result.text ?? '');
+    } catch (error) {
+      console.error('Transcription error:', error);
+      Alert.alert('Error', 'Failed to transcribe recording');
+    } finally {
+      setIsTranscribing(false);
     }
   };
 
@@ -129,6 +173,17 @@ export function VoiceRecorder() {
               {playerStatus.playing ? 'Pause Playback' : 'Play Recording'}
             </Text>
           </Button>
+
+          <View className="h-4" />
+
+          <Button
+            onPress={transcribeRecording}
+            disabled={!recordingUri || recorderState.isRecording || isTranscribing}
+            className="w-full bg-emerald-600 active:bg-emerald-700 disabled:bg-gray-400">
+            <Text className="text-base font-semibold text-white">
+              {isTranscribing ? 'Transcribing...' : 'Transcribe Recording'}
+            </Text>
+          </Button>
         </View>
 
         {playerStatus.isLoaded && recordingUri && (
@@ -143,6 +198,8 @@ export function VoiceRecorder() {
             )}
           </View>
         )}
+
+        <TranscriptionDisplay transcription={transcription} isTranscribing={isTranscribing} />
       </View>
     </View>
   );
