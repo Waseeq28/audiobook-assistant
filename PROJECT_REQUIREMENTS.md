@@ -17,3 +17,7 @@ An Expo (Android) audiobook player with voice-activated, context-aware AI assist
 - Stage 2 – LibriVox Integration: Connect the UI to the LibriVox API (audiobooks, audiotracks) to search, fetch metadata, and stream DRM-free audio. [API reference: https://librivox.org/api/info]
 - Stage 3 – Audio Experience: Implement background playback, timestamp capture, and resilience for slow networks or long recordings.
 - Stage 4 – Assistant Pipeline: Capture current playback context, call the AI service, and return synthesized voice responses while pausing/resuming audio appropriately.
+
+## Audio Clipper Requirement
+
+Implement an audio clipping capability that can extract a short window around the current playback timestamp, return the clipped snippet for local preview, and supply the same segment to downstream transcription.
