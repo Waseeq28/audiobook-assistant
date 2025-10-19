@@ -59,9 +59,3 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/upload-audio/deno.json"
 entrypoint = "./functions/upload-audio/index.ts"
-
-[functions.clip-audio]
-enabled = true
-verify_jwt = true
-import_map = "./functions/clip-audio/deno.json"
-entrypoint = "./functions/clip-audio/index.ts"
