@@ -16,11 +16,47 @@ serve(async (req: Request) => {
   }
 
   try {
-    const formData = await req.formData();
-    const file = formData.get('file');
+    const contentType = req.headers.get('content-type') ?? '';
+    let audioFile: File | null = null;
 
-    if (!(file instanceof File)) {
-      return new Response(JSON.stringify({ error: 'Missing audio file' }), {
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      const file = formData.get('file');
+
+      if (file instanceof File) {
+        audioFile = file;
+      } else {
+        return new Response(JSON.stringify({ error: 'Missing audio file' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    } else {
+      const { clipUrl } = (await req.json()) as { clipUrl?: string };
+
+      if (!clipUrl) {
+        return new Response(JSON.stringify({ error: 'clipUrl is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const clipResponse = await fetch(clipUrl);
+
+      if (!clipResponse.ok) {
+        return new Response(JSON.stringify({ error: 'Unable to fetch clip' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const arrayBuffer = await clipResponse.arrayBuffer();
+      const mimeType = clipResponse.headers.get('content-type') ?? 'audio/m4a';
+      audioFile = new File([arrayBuffer], 'clip.m4a', { type: mimeType });
+    }
+
+    if (!audioFile) {
+      return new Response(JSON.stringify({ error: 'No audio provided' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -36,7 +72,7 @@ serve(async (req: Request) => {
 
     const whisperFormData = new FormData();
     whisperFormData.append('model', 'whisper-1');
-    whisperFormData.append('file', file, file.name);
+    whisperFormData.append('file', audioFile, audioFile.name);
 
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
