@@ -125,7 +125,7 @@ export function VoiceRecorder() {
 
   if (!permissionGranted) {
     return (
-      <View className="flex-1 items-center justify-center px-6">
+      <View className="items-center justify-center px-6 py-16">
         <Text className="text-center text-base text-muted-foreground">
           Microphone permission is required to test voice recording.
         </Text>
@@ -134,8 +134,8 @@ export function VoiceRecorder() {
   }
 
   return (
-    <View className="flex-1 px-6">
-      <View className="mb-6 rounded-2xl bg-white p-6 shadow-lg">
+    <View className="px-6 pb-12">
+      <View className="rounded-2xl bg-white p-6 shadow-lg">
         <Text className="mb-4 text-center text-xl font-bold text-slate-800">Voice Recording</Text>
 
         <View className="mb-4 rounded-lg bg-slate-100 p-4">
