@@ -5,16 +5,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui/text';
 
 interface FileUploadProps {
-  onFileSelected: (fileUri: string, fileName: string) => void;
-}
-
-export function FileUpload({ onFileSelected }: FileUploadProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [uploadInfo, setUploadInfo] = useState<{
-    path: string;
+  onUploadComplete: (file: {
+    localUri: string;
+    name: string;
+    storagePath: string;
     signedUrl?: string;
     mimeType?: string;
-    originalName?: string;
+  }) => void;
+}
+
+export function FileUpload({ onUploadComplete }: FileUploadProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [uploadInfo, setUploadInfo] = useState<{
+    localUri: string;
+    name: string;
+    storagePath: string;
+    signedUrl?: string;
+    mimeType?: string;
   } | null>(null);
 
   const pickDocument = async () => {
@@ -27,7 +34,6 @@ export function FileUpload({ onFileSelected }: FileUploadProps) {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
-        onFileSelected(file.uri, file.name);
 
         const formData = new FormData();
         formData.append('file', {
@@ -56,10 +62,18 @@ export function FileUpload({ onFileSelected }: FileUploadProps) {
           path: string;
           signedUrl?: string;
           mimeType?: string;
-          originalName?: string;
         };
 
-        setUploadInfo(uploadResult);
+        const completedUpload = {
+          localUri: file.uri,
+          name: file.name,
+          storagePath: uploadResult.path,
+          signedUrl: uploadResult.signedUrl,
+          mimeType: uploadResult.mimeType ?? file.mimeType,
+        };
+
+        setUploadInfo(completedUpload);
+        onUploadComplete(completedUpload);
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to pick document');
@@ -89,7 +103,7 @@ export function FileUpload({ onFileSelected }: FileUploadProps) {
       {uploadInfo && (
         <View className="rounded-xl border border-blue-200 bg-blue-50 p-4">
           <Text className="text-sm font-semibold text-blue-700">Uploaded clip ready</Text>
-          <Text className="mt-1 text-xs text-blue-600">Path: {uploadInfo.path}</Text>
+          <Text className="mt-1 text-xs text-blue-600">Path: {uploadInfo.storagePath}</Text>
           {uploadInfo.signedUrl && (
             <Text
               className="mt-1 text-xs text-blue-600 underline"

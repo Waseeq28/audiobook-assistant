@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui/text';
 import { AIAssistantButton } from '@/components/ai-assistant-button';
 import { Button } from '@/components/ui/button';
+import { TranscriptionDisplay } from '@/components/transcription-display';
 import { LibriVoxSection } from '@/lib/types';
 
 // --- Component Props ---
@@ -29,6 +30,8 @@ export function AudioPlayer({ section, onPlaybackEnd, onAIAssistantPress }: Audi
   } | null>(null);
   const [isClipping, setIsClipping] = useState(false);
   const [clipError, setClipError] = useState<string | null>(null);
+  const [transcription, setTranscription] = useState<string | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
   // --- Audio Player Setup ---
   const player = useAudioPlayer(section.listen_url);
@@ -179,6 +182,7 @@ export function AudioPlayer({ section, onPlaybackEnd, onAIAssistantPress }: Audi
 
             setIsClipping(true);
             setClipError(null);
+            setTranscription(null);
             try {
               const payload = {
                 sourceType: 'remote' as const,
@@ -187,17 +191,13 @@ export function AudioPlayer({ section, onPlaybackEnd, onAIAssistantPress }: Audi
                 windowSeconds: 5,
               };
 
-              const response = await fetch(
-                `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/clip-audio`,
-                {
-                  method: 'POST',
-                  headers: {
-                    Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify(payload),
-                }
-              );
+              const response = await fetch(`${process.env.EXPO_PUBLIC_CLIPPER_URL}/api/clip`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+              });
 
               if (!response.ok) {
                 const errorText = await response.text();
@@ -213,6 +213,34 @@ export function AudioPlayer({ section, onPlaybackEnd, onAIAssistantPress }: Audi
                 startSeconds: data.clip.startSeconds,
                 endSeconds: data.clip.endSeconds,
               });
+
+              setIsTranscribing(true);
+              try {
+                const transcriptionResponse = await fetch(
+                  `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/transcribe-audio`,
+                  {
+                    method: 'POST',
+                    headers: {
+                      Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ clipUrl: data.clip.signedUrl }),
+                  }
+                );
+
+                if (!transcriptionResponse.ok) {
+                  const errorText = await transcriptionResponse.text();
+                  throw new Error(errorText || 'Transcription request failed');
+                }
+
+                const transcriptionData = (await transcriptionResponse.json()) as { text?: string };
+                setTranscription(transcriptionData.text ?? '');
+              } catch (transcriptionError) {
+                console.error('Transcription error:', transcriptionError);
+                setClipError('Clip generated but transcription failed');
+              } finally {
+                setIsTranscribing(false);
+              }
               onAIAssistantPress?.();
             } catch (error) {
               console.error('Clip request error:', error);
@@ -250,6 +278,10 @@ export function AudioPlayer({ section, onPlaybackEnd, onAIAssistantPress }: Audi
             <Text>{clipPreviewStatus.playing ? 'Pause Clip' : 'Play Clip'}</Text>
           </Button>
         </View>
+      )}
+
+      {clipInfo && (
+        <TranscriptionDisplay transcription={transcription} isTranscribing={isTranscribing} />
       )}
     </View>
   );

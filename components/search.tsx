@@ -12,7 +12,13 @@ export function Search() {
   const [results, setResults] = useState<LibriVoxAudiobook[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [uploadedFile, setUploadedFile] = useState<{ uri: string; name: string } | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<{
+    localUri: string;
+    name: string;
+    storagePath: string;
+    signedUrl?: string;
+    mimeType?: string;
+  } | null>(null);
 
   // An async function to perform the actual search for a given query.
   const performSearch = async () => {
@@ -56,21 +62,26 @@ export function Search() {
   //   return;
   // }
 
-  const handleFileSelected = (fileUri: string, fileName: string) => {
-    setUploadedFile({ uri: fileUri, name: fileName });
-    // Clear search results when uploading a file
+  const handleUploadComplete = (file: {
+    localUri: string;
+    name: string;
+    storagePath: string;
+    signedUrl?: string;
+    mimeType?: string;
+  }) => {
+    setUploadedFile(file);
     setResults([]);
   };
 
   return (
     <>
       <View className="px-6 pb-4">
-        <FileUpload onFileSelected={handleFileSelected} />
+        <FileUpload onUploadComplete={handleUploadComplete} />
 
         {uploadedFile && (
           <View className="mb-4 rounded-xl bg-green-50 p-3">
             <Text className="text-sm font-medium text-green-800">📁 {uploadedFile.name}</Text>
-            <Text className="text-xs text-green-600">Ready for AI testing</Text>
+            <Text className="text-xs text-green-600">Stored at {uploadedFile.storagePath}</Text>
           </View>
         )}
 
@@ -100,8 +111,13 @@ export function Search() {
       {uploadedFile ? (
         <View className="px-6 pb-6">
           <UploadedAudioPlayer
-            fileUri={uploadedFile.uri}
-            fileName={uploadedFile.name}
+            file={{
+              uri: uploadedFile.localUri,
+              name: uploadedFile.name,
+              storagePath: uploadedFile.storagePath,
+              signedUrl: uploadedFile.signedUrl,
+              mimeType: uploadedFile.mimeType,
+            }}
             onPlaybackEnd={() => console.log('Uploaded audio playback ended')}
             onAIAssistantPress={() => console.log('AI Assistant activated for uploaded file')}
           />
