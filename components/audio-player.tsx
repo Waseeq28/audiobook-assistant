@@ -13,15 +13,22 @@ import { AIAssistantButton } from '@/components/ai-assistant-button';
 import { Button } from '@/components/ui/button';
 import { TranscriptionDisplay } from '@/components/transcription-display';
 import { LibriVoxSection } from '@/lib/types';
+import { ClipTranscriptionPayload } from '@/components/uploaded-audio-player';
 
 // --- Component Props ---
 interface AudioPlayerProps {
   section: LibriVoxSection;
   onPlaybackEnd?: (didJustFinish: boolean) => void;
-  onAIAssistantPress?: () => void;
+  onAIAssistantPress?: (payload: ClipTranscriptionPayload) => void;
+  onTranscriptionChange?: (transcription: string | null) => void;
 }
 
-export function AudioPlayer({ section, onPlaybackEnd, onAIAssistantPress }: AudioPlayerProps) {
+export function AudioPlayer({
+  section,
+  onPlaybackEnd,
+  onAIAssistantPress,
+  onTranscriptionChange,
+}: AudioPlayerProps) {
   const [progressBarWidth, setProgressBarWidth] = useState(0);
   const [clipInfo, setClipInfo] = useState<{
     url: string;
@@ -208,13 +215,15 @@ export function AudioPlayer({ section, onPlaybackEnd, onAIAssistantPress }: Audi
                 clip: { signedUrl: string; startSeconds: number; endSeconds: number };
               };
 
-              setClipInfo({
+              const nextClip = {
                 url: data.clip.signedUrl,
                 startSeconds: data.clip.startSeconds,
                 endSeconds: data.clip.endSeconds,
-              });
+              };
+              setClipInfo(nextClip);
 
               setIsTranscribing(true);
+              let transcriptText: string | null = null;
               try {
                 const transcriptionResponse = await fetch(
                   `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/transcribe-audio`,
@@ -234,17 +243,27 @@ export function AudioPlayer({ section, onPlaybackEnd, onAIAssistantPress }: Audi
                 }
 
                 const transcriptionData = (await transcriptionResponse.json()) as { text?: string };
-                setTranscription(transcriptionData.text ?? '');
+                transcriptText = transcriptionData.text ?? '';
+                setTranscription(transcriptText);
+                onTranscriptionChange?.(transcriptText);
               } catch (transcriptionError) {
                 console.error('Transcription error:', transcriptionError);
                 setClipError('Clip generated but transcription failed');
+                onTranscriptionChange?.(null);
               } finally {
                 setIsTranscribing(false);
               }
-              onAIAssistantPress?.();
+              onAIAssistantPress?.({
+                clipUrl: nextClip.url,
+                transcription: transcriptText,
+                startSeconds: nextClip.startSeconds,
+                endSeconds: nextClip.endSeconds,
+                sourceType: 'remote',
+              });
             } catch (error) {
               console.error('Clip request error:', error);
               setClipError('Failed to generate clip');
+              onTranscriptionChange?.(null);
             } finally {
               setIsClipping(false);
             }

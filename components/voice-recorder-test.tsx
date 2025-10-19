@@ -13,7 +13,11 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { TranscriptionDisplay } from '@/components/transcription-display';
 
-export function VoiceRecorder() {
+interface VoiceRecorderProps {
+  onTranscriptionChange?: (transcription: string | null) => void;
+}
+
+export function VoiceRecorder({ onTranscriptionChange }: VoiceRecorderProps) {
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [transcription, setTranscription] = useState<string | null>(null);
@@ -47,6 +51,7 @@ export function VoiceRecorder() {
       await audioRecorder.prepareToRecordAsync();
       audioRecorder.record();
       setTranscription(null);
+      onTranscriptionChange?.(null);
     } catch (error) {
       console.error('Failed to start recording:', error);
       Alert.alert('Error', 'Failed to start recording');
@@ -114,10 +119,13 @@ export function VoiceRecorder() {
       }
 
       const result = (await response.json()) as { text?: string };
-      setTranscription(result.text ?? '');
+      const transcriptText = result.text ?? '';
+      setTranscription(transcriptText);
+      onTranscriptionChange?.(transcriptText);
     } catch (error) {
       console.error('Transcription error:', error);
       Alert.alert('Error', 'Failed to transcribe recording');
+      onTranscriptionChange?.(null);
     } finally {
       setIsTranscribing(false);
     }
