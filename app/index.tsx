@@ -5,11 +5,15 @@ import Constants from 'expo-constants';
 import { Text } from '@/components/ui/text';
 import { Search } from '@/components/search';
 import { VoiceRecorder } from '@/components/voice-recorder-test';
-import { UploadedAudioPlayer } from '@/components/uploaded-audio-player';
+import {
+  UploadedAudioPlayer,
+  type ClipTranscriptionPayload,
+} from '@/components/uploaded-audio-player';
 import { AudioPlayer } from '@/components/audio-player';
 import { getAudiobookById } from '@/lib/librivox-api';
 import { LibriVoxAudiobook, LibriVoxSection } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 type UploadedFile = {
   localUri: string;
@@ -26,6 +30,11 @@ export default function Home() {
   const [bookError, setBookError] = useState<string | null>(null);
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
+  const [clipContext, setClipContext] = useState<ClipTranscriptionPayload | null>(null);
+  const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
+  const [assistantStatus, setAssistantStatus] = useState<'idle' | 'waiting' | 'streaming'>('idle');
+  const [assistantOutput, setAssistantOutput] = useState('');
+  const [assistantError, setAssistantError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedBookId) {
@@ -79,12 +88,86 @@ export default function Home() {
   const handleBookSelect = (book: LibriVoxAudiobook) => {
     setUploadedFile(null);
     setSelectedBookId(book.id);
+    setClipContext(null);
+    setAssistantOutput('');
+    setAssistantError(null);
   };
 
   const handleUploadComplete = (file: UploadedFile) => {
     setUploadedFile(file);
     setSelectedBookId(null);
+    setClipContext(null);
+    setAssistantOutput('');
+    setAssistantError(null);
   };
+
+  const handleClipContext = (payload: ClipTranscriptionPayload) => {
+    setClipContext((prev) =>
+      prev && prev.clipUrl === payload.clipUrl
+        ? { ...prev, transcription: payload.transcription ?? prev.transcription }
+        : payload
+    );
+    setAssistantOutput('');
+    setAssistantError(null);
+  };
+
+  const handleVoiceTranscript = (transcript: string | null) => {
+    setVoiceTranscript(transcript);
+    setAssistantOutput('');
+    setAssistantError(null);
+  };
+
+  const sendTranscriptsToAssistant = async () => {
+    if (!clipContext?.transcription || !voiceTranscript) {
+      setAssistantError('Need both clip and recording transcripts first.');
+      return;
+    }
+
+    setAssistantStatus('waiting');
+    setAssistantOutput('');
+    setAssistantError(null);
+
+    try {
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/assistant-stream`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            clip: {
+              url: clipContext.clipUrl,
+              transcript: clipContext.transcription,
+              startSeconds: clipContext.startSeconds,
+              endSeconds: clipContext.endSeconds,
+              source: clipContext.sourceType,
+            },
+            userRecording: {
+              transcript: voiceTranscript,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Assistant request failed');
+      }
+
+      const { message } = (await response.json()) as { message?: string };
+      setAssistantOutput(message ?? '');
+      setAssistantStatus('idle');
+    } catch (error) {
+      console.error('Assistant streaming error:', error);
+      setAssistantStatus('idle');
+      setAssistantError('Failed to fetch assistant response');
+    }
+  };
+
+  const canSend = useMemo(() => {
+    return Boolean(clipContext?.transcription && voiceTranscript);
+  }, [clipContext?.transcription, voiceTranscript]);
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -165,7 +248,10 @@ export default function Home() {
                 <AudioPlayer
                   section={activeSection}
                   onPlaybackEnd={() => {}}
-                  onAIAssistantPress={() => {}}
+                  onAIAssistantPress={handleClipContext}
+                  onTranscriptionChange={(transcription) => {
+                    setClipContext((prev) => (prev ? { ...prev, transcription } : prev));
+                  }}
                 />
               )}
             </View>
@@ -182,12 +268,68 @@ export default function Home() {
                   mimeType: uploadedFile.mimeType,
                 }}
                 onPlaybackEnd={() => {}}
-                onAIAssistantPress={() => {}}
+                onAIAssistantPress={handleClipContext}
+                onTranscriptionChange={(transcription) => {
+                  setClipContext((prev) => (prev ? { ...prev, transcription } : prev));
+                }}
               />
             </View>
           )}
 
-          <VoiceRecorder />
+          <VoiceRecorder onTranscriptionChange={handleVoiceTranscript} />
+
+          <View className="mt-6 rounded-2xl bg-white p-6 shadow-lg">
+            <Text className="text-lg font-semibold text-slate-900">AI Assistant Response</Text>
+            <Text className="mt-1 text-sm text-slate-500">
+              Sends the latest clip transcript and your recorded question to the assistant.
+            </Text>
+
+            <Button
+              className="mt-4 bg-purple-600 active:bg-purple-700"
+              onPress={sendTranscriptsToAssistant}
+              disabled={
+                !canSend || assistantStatus === 'waiting' || assistantStatus === 'streaming'
+              }>
+              <Text className="text-base font-semibold text-white">
+                {assistantStatus === 'streaming'
+                  ? 'Streaming...'
+                  : assistantStatus === 'waiting'
+                    ? 'Preparing...'
+                    : 'Send transcripts'}
+              </Text>
+            </Button>
+
+            <View className="mt-4 space-y-3">
+              <View className="rounded-lg bg-slate-100 p-3">
+                <Text className="text-xs uppercase tracking-wide text-slate-500">
+                  Clip Transcript Snapshot
+                </Text>
+                <Text className="mt-2 text-sm text-slate-700">
+                  {clipContext?.transcription ?? 'Clip transcript not captured yet.'}
+                </Text>
+              </View>
+
+              <View className="rounded-lg bg-slate-100 p-3">
+                <Text className="text-xs uppercase tracking-wide text-slate-500">
+                  Recorded Question Transcript
+                </Text>
+                <Text className="mt-2 text-sm text-slate-700">
+                  {voiceTranscript ?? 'Record a question to capture transcript.'}
+                </Text>
+              </View>
+            </View>
+
+            {assistantError && <Text className="mt-3 text-sm text-red-500">{assistantError}</Text>}
+
+            {assistantOutput.length > 0 && (
+              <View className="mt-4 rounded-lg bg-slate-100 p-4">
+                <Text className="text-xs uppercase tracking-wide text-slate-500">
+                  Assistant Reply
+                </Text>
+                <Text className="mt-2 text-sm text-slate-700">{assistantOutput}</Text>
+              </View>
+            )}
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
