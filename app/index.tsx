@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import Constants from 'expo-constants';
 import { Text } from '@/components/ui/text';
 import { Search } from '@/components/search';
@@ -35,6 +36,23 @@ export default function Home() {
   const [assistantStatus, setAssistantStatus] = useState<'idle' | 'waiting' | 'streaming'>('idle');
   const [assistantOutput, setAssistantOutput] = useState('');
   const [assistantError, setAssistantError] = useState<string | null>(null);
+  const [ttsClipUrl, setTtsClipUrl] = useState<string | null>(null);
+  const [isTtsLoading, setIsTtsLoading] = useState(false);
+  const [ttsError, setTtsError] = useState<string | null>(null);
+  const [shouldAutoplayTts, setShouldAutoplayTts] = useState(false);
+
+  const ttsPlayer = useAudioPlayer(ttsClipUrl ?? '');
+  const ttsStatus = useAudioPlayerStatus(ttsPlayer);
+
+  const resetTtsState = () => {
+    if (ttsStatus.playing) {
+      ttsPlayer.pause();
+    }
+    setTtsClipUrl(null);
+    setIsTtsLoading(false);
+    setTtsError(null);
+    setShouldAutoplayTts(false);
+  };
 
   useEffect(() => {
     if (!selectedBookId) {
@@ -79,6 +97,13 @@ export default function Home() {
     };
   }, [selectedBookId]);
 
+  useEffect(() => {
+    if (shouldAutoplayTts && ttsClipUrl && ttsStatus.isLoaded) {
+      ttsPlayer.play();
+      setShouldAutoplayTts(false);
+    }
+  }, [shouldAutoplayTts, ttsClipUrl, ttsStatus.isLoaded, ttsPlayer]);
+
   const sections = useMemo(() => selectedBook?.sections ?? [], [selectedBook]);
   const activeSection: LibriVoxSection | null = useMemo(() => {
     if (!sections.length || !selectedSectionId) return null;
@@ -91,6 +116,7 @@ export default function Home() {
     setClipContext(null);
     setAssistantOutput('');
     setAssistantError(null);
+    resetTtsState();
   };
 
   const handleUploadComplete = (file: UploadedFile) => {
@@ -99,6 +125,7 @@ export default function Home() {
     setClipContext(null);
     setAssistantOutput('');
     setAssistantError(null);
+    resetTtsState();
   };
 
   const handleClipContext = (payload: ClipTranscriptionPayload) => {
@@ -109,12 +136,14 @@ export default function Home() {
     );
     setAssistantOutput('');
     setAssistantError(null);
+    resetTtsState();
   };
 
   const handleVoiceTranscript = (transcript: string | null) => {
     setVoiceTranscript(transcript);
     setAssistantOutput('');
     setAssistantError(null);
+    resetTtsState();
   };
 
   const sendTranscriptsToAssistant = async () => {
@@ -123,6 +152,7 @@ export default function Home() {
       return;
     }
 
+    resetTtsState();
     setAssistantStatus('waiting');
     setAssistantOutput('');
     setAssistantError(null);
@@ -165,9 +195,69 @@ export default function Home() {
     }
   };
 
+  const handlePlayAssistantSpeech = async () => {
+    if (!assistantOutput.trim()) {
+      return;
+    }
+
+    if (!ttsClipUrl) {
+      try {
+        setIsTtsLoading(true);
+        setTtsError(null);
+
+        const response = await fetch(
+          `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/assistant-tts`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ text: assistantOutput, voice: 'alloy' }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('TTS request failed');
+        }
+
+        const result = (await response.json()) as { signedUrl?: string };
+        if (!result.signedUrl) {
+          throw new Error('Missing speech URL');
+        }
+
+        setTtsClipUrl(result.signedUrl);
+        setShouldAutoplayTts(true);
+      } catch (error) {
+        console.error('Assistant speech error:', error);
+        setTtsClipUrl(null);
+        setShouldAutoplayTts(false);
+        setTtsError('Unable to generate speech');
+      } finally {
+        setIsTtsLoading(false);
+      }
+      return;
+    }
+
+    if (!ttsStatus.isLoaded || ttsStatus.isBuffering) {
+      return;
+    }
+
+    if (ttsStatus.playing) {
+      ttsPlayer.pause();
+    } else {
+      if (ttsStatus.didJustFinish) {
+        ttsPlayer.seekTo(0);
+      }
+      ttsPlayer.play();
+    }
+  };
+
   const canSend = useMemo(() => {
     return Boolean(clipContext?.transcription && voiceTranscript);
   }, [clipContext?.transcription, voiceTranscript]);
+
+  const isTtsBusy = isTtsLoading || ttsStatus.isBuffering;
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -327,6 +417,23 @@ export default function Home() {
                   Assistant Reply
                 </Text>
                 <Text className="mt-2 text-sm text-slate-700">{assistantOutput}</Text>
+                <Button
+                  className="mt-4 bg-purple-600 active:bg-purple-700 disabled:bg-gray-400"
+                  onPress={handlePlayAssistantSpeech}
+                  disabled={isTtsBusy}>
+                  {isTtsBusy ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text className="text-base font-semibold text-white">
+                      {ttsClipUrl
+                        ? ttsStatus.playing
+                          ? 'Pause Voice'
+                          : 'Play Voice'
+                        : 'Play AI Voice'}
+                    </Text>
+                  )}
+                </Button>
+                {ttsError && <Text className="mt-3 text-xs text-red-500">{ttsError}</Text>}
               </View>
             )}
           </View>
