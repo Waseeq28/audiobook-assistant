@@ -5,19 +5,20 @@ An Expo (Android) audiobook player with voice-activated, context-aware AI assist
 ## Key Features
 
 - LibriVox API integration that provides DRM-free audio files.
-- A button which can be tapped by the user when a recording is being played
-- User asks a question regarding the timestamp context (e.g, meaning of a word or details of an event mentioned in that particular moment of audiobook)
-- The timestamp context and user query are sent to the AI
-- AI responds with voice being aware of the book timestamp context and user query
-- User can tap the button again and resume listening to the audiobook after receiving the answer
+- A search feature for getting audiobooks from LibriVox and an upload feature which lets user upload from mobile storage
+- An audio player for the audiobooks
+- An AI Assistant button in the audio player tapping which leads to a totally automated and immediate "Assistant Flow" as follows:
 
-## MVP-focused Development Plan
+    1) An audio clip is created and transcribed (clip-transcription) with a window of few seconds before and after the current timestamp to provide the context of the audiobook
+    2) The voice recorder is enabled, user asks the question (e.g, meaning of a word or details of an event mentioned), which is then transcribed (user-transcription)
+    3) Both clip and user transcriptions are sent to an AI which has the audiobook context and the user's query
+    4) AI gives a response, and the response is converted to voice 
+    5) Once the flow is completed and user's query is answered, audiobook playback can be manually resumed by the user
 
-- Stage 1 – LibriVox UI Shell: Build Expo screens for browsing/searching titles, book details, and core playback controls against mocked data.
-- Stage 2 – LibriVox Integration: Connect the UI to the LibriVox API (audiobooks, audiotracks) to search, fetch metadata, and stream DRM-free audio. [API reference: https://librivox.org/api/info]
-- Stage 3 – Audio Experience: Implement background playback, timestamp capture, and resilience for slow networks or long recordings.
-- Stage 4 – Assistant Pipeline: Capture current playback context, call the AI service, and return synthesized voice responses while pausing/resuming audio appropriately.
+- Create test UIs for every step, but once success is confirmed for each component, the test UI is removed.
+- Final UI has a minimalist, user frinedly player with one button for controlling the Assistant Flow. Rest of processing happens in the background
+- The button uses text for indicating the status (listening, processing, speaking).  
 
 ## Audio Clipper Requirement
 
-Implement an audio clipping capability that can extract a short window around the current playback timestamp, return the clipped snippet for local preview, and supply the same segment to downstream transcription.
+Implement an audio clipping service using Vercel serverless deployment. It can extract a short window around the current playback timestamp, return the clipped snippet for local preview, and supply the same segment to downstream transcription.

@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import Constants from 'expo-constants';
 import { Text } from '@/components/ui/text';
 import { Search } from '@/components/search';
-import { VoiceRecorder } from '@/components/voice-recorder-test';
 import {
   UploadedAudioPlayer,
   type ClipTranscriptionPayload,
@@ -14,7 +12,6 @@ import { AudioPlayer } from '@/components/audio-player';
 import { getAudiobookById } from '@/lib/librivox-api';
 import { LibriVoxAudiobook, LibriVoxSection } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 
 type UploadedFile = {
   localUri: string;
@@ -31,28 +28,7 @@ export default function Home() {
   const [bookError, setBookError] = useState<string | null>(null);
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
-  const [clipContext, setClipContext] = useState<ClipTranscriptionPayload | null>(null);
-  const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
-  const [assistantStatus, setAssistantStatus] = useState<'idle' | 'waiting' | 'streaming'>('idle');
-  const [assistantOutput, setAssistantOutput] = useState('');
-  const [assistantError, setAssistantError] = useState<string | null>(null);
-  const [ttsClipUrl, setTtsClipUrl] = useState<string | null>(null);
-  const [isTtsLoading, setIsTtsLoading] = useState(false);
-  const [ttsError, setTtsError] = useState<string | null>(null);
-  const [shouldAutoplayTts, setShouldAutoplayTts] = useState(false);
-
-  const ttsPlayer = useAudioPlayer(ttsClipUrl ?? '');
-  const ttsStatus = useAudioPlayerStatus(ttsPlayer);
-
-  const resetTtsState = () => {
-    if (ttsStatus.playing) {
-      ttsPlayer.pause();
-    }
-    setTtsClipUrl(null);
-    setIsTtsLoading(false);
-    setTtsError(null);
-    setShouldAutoplayTts(false);
-  };
+  const [, setPendingAssistantRequest] = useState<ClipTranscriptionPayload | null>(null);
 
   useEffect(() => {
     if (!selectedBookId) {
@@ -97,13 +73,6 @@ export default function Home() {
     };
   }, [selectedBookId]);
 
-  useEffect(() => {
-    if (shouldAutoplayTts && ttsClipUrl && ttsStatus.isLoaded) {
-      ttsPlayer.play();
-      setShouldAutoplayTts(false);
-    }
-  }, [shouldAutoplayTts, ttsClipUrl, ttsStatus.isLoaded, ttsPlayer]);
-
   const sections = useMemo(() => selectedBook?.sections ?? [], [selectedBook]);
   const activeSection: LibriVoxSection | null = useMemo(() => {
     if (!sections.length || !selectedSectionId) return null;
@@ -113,151 +82,17 @@ export default function Home() {
   const handleBookSelect = (book: LibriVoxAudiobook) => {
     setUploadedFile(null);
     setSelectedBookId(book.id);
-    setClipContext(null);
-    setAssistantOutput('');
-    setAssistantError(null);
-    resetTtsState();
+    setPendingAssistantRequest(null);
   };
 
   const handleUploadComplete = (file: UploadedFile) => {
     setUploadedFile(file);
     setSelectedBookId(null);
-    setClipContext(null);
-    setAssistantOutput('');
-    setAssistantError(null);
-    resetTtsState();
+    setPendingAssistantRequest(null);
   };
-
-  const handleClipContext = (payload: ClipTranscriptionPayload) => {
-    setClipContext((prev) =>
-      prev && prev.clipUrl === payload.clipUrl
-        ? { ...prev, transcription: payload.transcription ?? prev.transcription }
-        : payload
-    );
-    setAssistantOutput('');
-    setAssistantError(null);
-    resetTtsState();
+  const handleAssistantInitiated = (payload: ClipTranscriptionPayload) => {
+    setPendingAssistantRequest(payload);
   };
-
-  const handleVoiceTranscript = (transcript: string | null) => {
-    setVoiceTranscript(transcript);
-    setAssistantOutput('');
-    setAssistantError(null);
-    resetTtsState();
-  };
-
-  const sendTranscriptsToAssistant = async () => {
-    if (!clipContext?.transcription || !voiceTranscript) {
-      setAssistantError('Need both clip and recording transcripts first.');
-      return;
-    }
-
-    resetTtsState();
-    setAssistantStatus('waiting');
-    setAssistantOutput('');
-    setAssistantError(null);
-
-    try {
-      const response = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/assistant-stream`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            clip: {
-              url: clipContext.clipUrl,
-              transcript: clipContext.transcription,
-              startSeconds: clipContext.startSeconds,
-              endSeconds: clipContext.endSeconds,
-              source: clipContext.sourceType,
-            },
-            userRecording: {
-              transcript: voiceTranscript,
-            },
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Assistant request failed');
-      }
-
-      const { message } = (await response.json()) as { message?: string };
-      setAssistantOutput(message ?? '');
-      setAssistantStatus('idle');
-    } catch (error) {
-      console.error('Assistant streaming error:', error);
-      setAssistantStatus('idle');
-      setAssistantError('Failed to fetch assistant response');
-    }
-  };
-
-  const handlePlayAssistantSpeech = async () => {
-    if (!assistantOutput.trim()) {
-      return;
-    }
-
-    if (!ttsClipUrl) {
-      try {
-        setIsTtsLoading(true);
-        setTtsError(null);
-
-        const response = await fetch(
-          `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/assistant-tts`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ text: assistantOutput, voice: 'alloy' }),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('TTS request failed');
-        }
-
-        const result = (await response.json()) as { signedUrl?: string };
-        if (!result.signedUrl) {
-          throw new Error('Missing speech URL');
-        }
-
-        setTtsClipUrl(result.signedUrl);
-        setShouldAutoplayTts(true);
-      } catch (error) {
-        console.error('Assistant speech error:', error);
-        setTtsClipUrl(null);
-        setShouldAutoplayTts(false);
-        setTtsError('Unable to generate speech');
-      } finally {
-        setIsTtsLoading(false);
-      }
-      return;
-    }
-
-    if (!ttsStatus.isLoaded || ttsStatus.isBuffering) {
-      return;
-    }
-
-    if (ttsStatus.playing) {
-      ttsPlayer.pause();
-    } else {
-      if (ttsStatus.didJustFinish) {
-        ttsPlayer.seekTo(0);
-      }
-      ttsPlayer.play();
-    }
-  };
-
-  const canSend = useMemo(() => {
-    return Boolean(clipContext?.transcription && voiceTranscript);
-  }, [clipContext?.transcription, voiceTranscript]);
-
-  const isTtsBusy = isTtsLoading || ttsStatus.isBuffering;
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -338,10 +173,7 @@ export default function Home() {
                 <AudioPlayer
                   section={activeSection}
                   onPlaybackEnd={() => {}}
-                  onAIAssistantPress={handleClipContext}
-                  onTranscriptionChange={(transcription) => {
-                    setClipContext((prev) => (prev ? { ...prev, transcription } : prev));
-                  }}
+                  onAIAssistantPress={handleAssistantInitiated}
                 />
               )}
             </View>
@@ -358,85 +190,10 @@ export default function Home() {
                   mimeType: uploadedFile.mimeType,
                 }}
                 onPlaybackEnd={() => {}}
-                onAIAssistantPress={handleClipContext}
-                onTranscriptionChange={(transcription) => {
-                  setClipContext((prev) => (prev ? { ...prev, transcription } : prev));
-                }}
+                onAIAssistantPress={handleAssistantInitiated}
               />
             </View>
           )}
-
-          <VoiceRecorder onTranscriptionChange={handleVoiceTranscript} />
-
-          <View className="mt-6 rounded-2xl bg-white p-6 shadow-lg">
-            <Text className="text-lg font-semibold text-slate-900">AI Assistant Response</Text>
-            <Text className="mt-1 text-sm text-slate-500">
-              Sends the latest clip transcript and your recorded question to the assistant.
-            </Text>
-
-            <Button
-              className="mt-4 bg-purple-600 active:bg-purple-700"
-              onPress={sendTranscriptsToAssistant}
-              disabled={
-                !canSend || assistantStatus === 'waiting' || assistantStatus === 'streaming'
-              }>
-              <Text className="text-base font-semibold text-white">
-                {assistantStatus === 'streaming'
-                  ? 'Streaming...'
-                  : assistantStatus === 'waiting'
-                    ? 'Preparing...'
-                    : 'Send transcripts'}
-              </Text>
-            </Button>
-
-            <View className="mt-4 space-y-3">
-              <View className="rounded-lg bg-slate-100 p-3">
-                <Text className="text-xs uppercase tracking-wide text-slate-500">
-                  Clip Transcript Snapshot
-                </Text>
-                <Text className="mt-2 text-sm text-slate-700">
-                  {clipContext?.transcription ?? 'Clip transcript not captured yet.'}
-                </Text>
-              </View>
-
-              <View className="rounded-lg bg-slate-100 p-3">
-                <Text className="text-xs uppercase tracking-wide text-slate-500">
-                  Recorded Question Transcript
-                </Text>
-                <Text className="mt-2 text-sm text-slate-700">
-                  {voiceTranscript ?? 'Record a question to capture transcript.'}
-                </Text>
-              </View>
-            </View>
-
-            {assistantError && <Text className="mt-3 text-sm text-red-500">{assistantError}</Text>}
-
-            {assistantOutput.length > 0 && (
-              <View className="mt-4 rounded-lg bg-slate-100 p-4">
-                <Text className="text-xs uppercase tracking-wide text-slate-500">
-                  Assistant Reply
-                </Text>
-                <Text className="mt-2 text-sm text-slate-700">{assistantOutput}</Text>
-                <Button
-                  className="mt-4 bg-purple-600 active:bg-purple-700 disabled:bg-gray-400"
-                  onPress={handlePlayAssistantSpeech}
-                  disabled={isTtsBusy}>
-                  {isTtsBusy ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text className="text-base font-semibold text-white">
-                      {ttsClipUrl
-                        ? ttsStatus.playing
-                          ? 'Pause Voice'
-                          : 'Play Voice'
-                        : 'Play AI Voice'}
-                    </Text>
-                  )}
-                </Button>
-                {ttsError && <Text className="mt-3 text-xs text-red-500">{ttsError}</Text>}
-              </View>
-            )}
-          </View>
         </View>
       </ScrollView>
     </SafeAreaView>

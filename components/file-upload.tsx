@@ -3,6 +3,7 @@ import { View, TouchableOpacity, Alert, Linking } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui/text';
+import { useAudioUpload } from '@/hooks';
 
 interface FileUploadProps {
   onUploadComplete: (file: {
@@ -15,7 +16,7 @@ interface FileUploadProps {
 }
 
 export function FileUpload({ onUploadComplete }: FileUploadProps) {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSelecting, setIsSelecting] = useState(false);
   const [uploadInfo, setUploadInfo] = useState<{
     localUri: string;
     name: string;
@@ -23,10 +24,11 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
     signedUrl?: string;
     mimeType?: string;
   } | null>(null);
+  const { upload, loading, error } = useAudioUpload();
 
   const pickDocument = async () => {
     try {
-      setIsLoading(true);
+      setIsSelecting(true);
       const result = await DocumentPicker.getDocumentAsync({
         type: 'audio/*',
         copyToCacheDirectory: true,
@@ -34,35 +36,11 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
-
-        const formData = new FormData();
-        formData.append('file', {
+        const uploadResult = await upload({
           uri: file.uri,
           name: file.name,
-          type: file.mimeType || 'audio/m4a',
-        } as any);
-
-        const response = await fetch(
-          `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/upload-audio`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
-            },
-            body: formData,
-          }
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || 'Failed to upload audio');
-        }
-
-        const uploadResult = (await response.json()) as {
-          path: string;
-          signedUrl?: string;
-          mimeType?: string;
-        };
+          type: file.mimeType,
+        });
 
         const completedUpload = {
           localUri: file.uri,
@@ -80,23 +58,29 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
       console.error('Document picker error:', error);
       setUploadInfo(null);
     } finally {
-      setIsLoading(false);
+      setIsSelecting(false);
     }
   };
+
+  if (error) {
+    console.error('Audio upload error:', error);
+  }
+
+  const isBusy = isSelecting || loading;
 
   return (
     <>
       <TouchableOpacity
         onPress={pickDocument}
-        disabled={isLoading}
+        disabled={isBusy}
         className="mb-4 h-16 flex-row items-center justify-center rounded-xl border-2 border-dashed border-blue-300 bg-blue-50">
         <Ionicons
-          name={isLoading ? 'hourglass-outline' : 'cloud-upload-outline'}
+          name={isBusy ? 'hourglass-outline' : 'cloud-upload-outline'}
           size={24}
           color="#3B82F6"
         />
         <Text className="ml-2 text-base font-medium text-blue-600">
-          {isLoading ? 'Selecting...' : 'Upload Audio File'}
+          {isBusy ? 'Selecting...' : 'Upload Audio File'}
         </Text>
       </TouchableOpacity>
 

@@ -1,18 +1,19 @@
 import React from 'react';
 import { TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui/text';
 
 interface AIAssistantButtonProps {
   onPress: () => void;
   isLoading?: boolean;
   disabled?: boolean;
+  label?: string;
 }
 
 export function AIAssistantButton({
   onPress,
   isLoading = false,
   disabled = false,
+  label = 'Ask',
 }: AIAssistantButtonProps) {
   return (
     <TouchableOpacity
@@ -22,7 +23,9 @@ export function AIAssistantButton({
       {isLoading ? (
         <ActivityIndicator size="small" color="#FFFFFF" />
       ) : (
-        <Ionicons name="chatbubble-ellipses" size={28} color="white" />
+        <Text className="text-center text-xs font-semibold uppercase tracking-wide text-white">
+          {label}
+        </Text>
       )}
     </TouchableOpacity>
   );

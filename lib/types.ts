@@ -46,3 +46,11 @@ export type LibriVoxAudiobook = {
 export type LibriVoxApiResponse = {
   books: LibriVoxAudiobook[];
 };
+
+export type ClipTranscriptionPayload = {
+  clipUrl: string;
+  transcription?: string | null;
+  startSeconds: number;
+  endSeconds: number;
+  sourceType?: 'remote' | 'uploaded';
+};

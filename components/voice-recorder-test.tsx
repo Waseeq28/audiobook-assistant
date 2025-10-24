@@ -1,91 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { View, Alert } from 'react-native';
-import {
-  useAudioRecorder,
-  AudioModule,
-  RecordingPresets,
-  setAudioModeAsync,
-  useAudioRecorderState,
-  useAudioPlayer,
-  useAudioPlayerStatus,
-} from 'expo-audio';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { TranscriptionDisplay } from '@/components/transcription-display';
+import { useTranscription, useVoiceRecorder } from '@/hooks';
 
 interface VoiceRecorderProps {
   onTranscriptionChange?: (transcription: string | null) => void;
 }
 
 export function VoiceRecorder({ onTranscriptionChange }: VoiceRecorderProps) {
-  const [recordingUri, setRecordingUri] = useState<string | null>(null);
-  const [permissionGranted, setPermissionGranted] = useState(false);
   const [transcription, setTranscription] = useState<string | null>(null);
-  const [isTranscribing, setIsTranscribing] = useState(false);
 
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const recorderState = useAudioRecorderState(audioRecorder);
+  const {
+    permissionGranted,
+    recordingUri,
+    recorderState,
+    playerStatus,
+    startRecording,
+    stopRecording,
+    playRecording,
+    clearRecording,
+  } = useVoiceRecorder();
 
-  const player = useAudioPlayer(recordingUri || '');
-  const playerStatus = useAudioPlayerStatus(player);
+  const { transcribeFile, loading: isTranscribing, error: transcriptionError } = useTranscription();
 
-  useEffect(() => {
-    (async () => {
-      const status = await AudioModule.requestRecordingPermissionsAsync();
-      if (!status.granted) {
-        Alert.alert('Permission Denied', 'Permission to access microphone was denied');
-        setPermissionGranted(false);
-      } else {
-        setPermissionGranted(true);
-      }
-
-      await setAudioModeAsync({
-        playsInSilentMode: true,
-        allowsRecording: true,
-      });
-    })();
-  }, []);
-
-  const startRecording = async () => {
-    try {
-      await audioRecorder.prepareToRecordAsync();
-      audioRecorder.record();
-      setTranscription(null);
-      onTranscriptionChange?.(null);
-    } catch (error) {
-      console.error('Failed to start recording:', error);
-      Alert.alert('Error', 'Failed to start recording');
-    }
-  };
-
-  const stopRecording = async () => {
-    try {
-      await audioRecorder.stop();
-      const uri = audioRecorder.uri;
-      if (uri) {
-        setRecordingUri(uri);
-        console.log('Recording saved at:', uri);
-      }
-    } catch (error) {
-      console.error('Failed to stop recording:', error);
-      Alert.alert('Error', 'Failed to stop recording');
-    }
-  };
-
-  const playRecording = () => {
-    if (!recordingUri) {
-      Alert.alert('No Recording', 'Please record audio first');
-      return;
-    }
-
-    if (playerStatus.playing) {
-      player.pause();
-    } else {
-      if (playerStatus.didJustFinish) {
-        player.seekTo(0);
-      }
-      player.play();
-    }
+  const handleStartRecording = () => {
+    setTranscription(null);
+    onTranscriptionChange?.(null);
+    clearRecording();
+    startRecording();
   };
 
   const transcribeRecording = async () => {
@@ -94,42 +38,23 @@ export function VoiceRecorder({ onTranscriptionChange }: VoiceRecorderProps) {
     }
 
     try {
-      setIsTranscribing(true);
-
-      const formData = new FormData();
-      formData.append('file', {
+      const transcriptText = await transcribeFile({
         uri: recordingUri,
         name: 'recording.m4a',
         type: 'audio/m4a',
-      } as any);
-
-      const response = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/transcribe-audio`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
-          },
-          body: formData,
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Transcription request failed');
-      }
-
-      const result = (await response.json()) as { text?: string };
-      const transcriptText = result.text ?? '';
+      });
       setTranscription(transcriptText);
       onTranscriptionChange?.(transcriptText);
     } catch (error) {
       console.error('Transcription error:', error);
       Alert.alert('Error', 'Failed to transcribe recording');
       onTranscriptionChange?.(null);
-    } finally {
-      setIsTranscribing(false);
     }
   };
+
+  if (transcriptionError) {
+    console.error('Transcription hook error:', transcriptionError);
+  }
 
   if (!permissionGranted) {
     return (
@@ -162,7 +87,7 @@ export function VoiceRecorder({ onTranscriptionChange }: VoiceRecorderProps) {
 
         <View className="space-y-3">
           {!recorderState.isRecording ? (
-            <Button onPress={startRecording} className="w-full bg-red-600 active:bg-red-700">
+            <Button onPress={handleStartRecording} className="w-full bg-red-600 active:bg-red-700">
               <Text className="text-base font-semibold text-white">Start Recording</Text>
             </Button>
           ) : (
